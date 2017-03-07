@@ -23,6 +23,9 @@
  ******************************************************************************/
 package com.triggertrap.sample;
 
+import android.os.Bundle;
+import android.os.Handler;
+
 /**
  * 
  * CustomActivity.java
@@ -30,6 +33,26 @@ package com.triggertrap.sample;
  * 
  */
 public class CustomActivity extends SimpleActivity {
+  public double amount = 0;
+  Handler timerHandler = new Handler();
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+
+    //Create a timer
+    Runnable timerRunnable = new Runnable() {
+
+      @Override
+      public void run() {
+        mSeekArc.setProgress(amount);
+        amount+=1.2;
+        mSeekArc.setThumbLabel("" + (int)amount);
+        timerHandler.postDelayed(this, 5);
+      }
+    };
+    //timerHandler.postDelayed(timerRunnable, 1000);
+  }
 
 
 	@Override

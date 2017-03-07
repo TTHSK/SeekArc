@@ -42,7 +42,7 @@ import com.triggertrap.seekarc.SeekArc.OnSeekArcChangeListener;
  */
 public class SimpleActivity extends Activity {
 
-	private SeekArc mSeekArc;
+	protected SeekArc mSeekArc;
 	private SeekBar mRotation;
 	private SeekBar mStartAngle;
 	private SeekBar mSweepAngle;
@@ -92,7 +92,7 @@ public class SimpleActivity extends Activity {
 			}
 
 			@Override
-			public void onProgressChanged(SeekArc seekArc, int progress,
+			public void onProgressChanged(SeekArc seekArc, double progress,
 										  boolean fromUser) {
 				mSeekArcProgress.setText(String.valueOf(progress));
 			}

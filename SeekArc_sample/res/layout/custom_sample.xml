@@ -50,10 +50,36 @@
             seekarc:max="150"
             seekarc:progressColor="@color/red"
             seekarc:rotation="180"
-            seekarc:startAngle="30"
-            seekarc:sweepAngle="300"
+            seekarc:startAngle="80"
+            seekarc:sweepAngle="210"
             seekarc:thumb="@drawable/custom_seek_arc_control_selector"
             seekarc:touchInside="true" />
+
+      <com.triggertrap.seekarc.SeekArc
+        android:id="@+id/seekArc2"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:padding="30dp"
+        seekarc:arcColor="@android:color/darker_gray"
+        seekarc:clockwise="true"
+        seekarc:max="150"
+        seekarc:progressColor="@color/red"
+        seekarc:progressColorSecondary="@android:color/black"
+        seekarc:rotation="180"
+        seekarc:startAngle="60"
+        seekarc:roundEdges="true"
+        seekarc:sweepAngle="240"
+        seekarc:arcWidth="20dp"
+        seekarc:progressWidth="20dp"
+        seekarc:thumb="@drawable/custom_seek_arc_control_selector"
+        seekarc:thumbText="15"
+        seekarc:thumbSize="20dp"
+        seekarc:thumbTextColor="@android:color/white"
+        seekarc:thumbTextSize="@dimen/doot"
+        seekarc:touchInside="true" />
 
         <TextView
             android:id="@+id/seekArcProgress"

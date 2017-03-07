@@ -27,11 +27,22 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.EmbossMaskFilter;
+import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
+import android.graphics.SweepGradient;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.support.v4.content.ContextCompat;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -42,7 +53,7 @@ import android.view.View;
  * This is a class that functions much like a SeekBar but
  * follows a circle path instead of a straight line.
  * 
- * @author Neil Davies
+ * @author Neil Davies, edits by Thomas Church
  * 
  */
 public class SeekArc extends View {
@@ -65,7 +76,7 @@ public class SeekArc extends View {
 	/**
 	 * The Current value that the SeekArc is set to
 	 */
-	private int mProgress = 0;
+	private double mProgress = 0;
 		
 	/**
 	 * The width of the progress line for this SeekArc
@@ -113,10 +124,14 @@ public class SeekArc extends View {
  	 */
 	private boolean mEnabled = true;
 
+  /** Label to draw on the thumb **/
+  private String mThumbLabel = "";
+
 	// Internal variables
 	private int mArcRadius = 0;
 	private float mProgressSweep = 0;
 	private RectF mArcRect = new RectF();
+  private Paint mTextPaint;
 	private Paint mArcPaint;
 	private Paint mProgressPaint;
 	private int mTranslateX;
@@ -126,6 +141,8 @@ public class SeekArc extends View {
 	private double mTouchAngle;
 	private float mTouchIgnoreRadius;
 	private OnSeekArcChangeListener mOnSeekArcChangeListener;
+  private int mProgressColor;
+  private Integer mProgressColorSecondary = null;
 
 	public interface OnSeekArcChangeListener {
 
@@ -144,7 +161,7 @@ public class SeekArc extends View {
 		 * @param fromUser
 		 *            True if the progress change was initiated by the user.
 		 */
-		void onProgressChanged(SeekArc seekArc, int progress, boolean fromUser);
+		void onProgressChanged(SeekArc seekArc, double progress, boolean fromUser);
 
 		/**
 		 * Notification that the user has started a touch gesture. Clients may
@@ -188,14 +205,19 @@ public class SeekArc extends View {
 
 		// Defaults, may need to link this into theme settings
 		int arcColor = res.getColor(R.color.progress_gray);
-		int progressColor = res.getColor(R.color.default_blue_light);
+		mProgressColor = res.getColor(R.color.default_blue_light);
 		int thumbHalfheight = 0;
 		int thumbHalfWidth = 0;
 		mThumb = res.getDrawable(R.drawable.seek_arc_control_selector);
 		// Convert progress width to pixels for current density
 		mProgressWidth = (int) (mProgressWidth * density);
 
-		
+
+    //Create text paint
+    mTextPaint = new Paint();
+    mTextPaint.setAntiAlias(true);
+    mTextPaint.setTextAlign(Paint.Align.CENTER);
+
 		if (attrs != null) {
 			// Attribute initialization
 			final TypedArray a = context.obtainStyledAttributes(attrs,
@@ -206,15 +228,18 @@ public class SeekArc extends View {
 				mThumb = thumb;
 			}
 
-			
-			
+      //Thumb height - we need to have a value for when we use a drawable that has no intrinsic height
 			thumbHalfheight = (int) mThumb.getIntrinsicHeight() / 2;
 			thumbHalfWidth = (int) mThumb.getIntrinsicWidth() / 2;
+      if ((int) a.getDimension(R.styleable.SeekArc_thumbSize, -1) > 0) {
+        thumbHalfheight = (int) a.getDimension(R.styleable.SeekArc_thumbSize, -1);
+        thumbHalfWidth = (int) a.getDimension(R.styleable.SeekArc_thumbSize, -1);
+      }
 			mThumb.setBounds(-thumbHalfWidth, -thumbHalfheight, thumbHalfWidth,
 					thumbHalfheight);
 
 			mMax = a.getInteger(R.styleable.SeekArc_max, mMax);
-			mProgress = a.getInteger(R.styleable.SeekArc_progress, mProgress);
+			mProgress = a.getFloat(R.styleable.SeekArc_progress, (float)mProgress);
 			mProgressWidth = (int) a.getDimension(
 					R.styleable.SeekArc_progressWidth, mProgressWidth);
 			mArcWidth = (int) a.getDimension(R.styleable.SeekArc_arcWidth,
@@ -230,9 +255,24 @@ public class SeekArc extends View {
 					mClockwise);
 			mEnabled = a.getBoolean(R.styleable.SeekArc_enabled, mEnabled);
 
+      //New thumb stuff
+      if (a.hasValue(R.styleable.SeekArc_thumbText))
+        mThumbLabel = a.getString(R.styleable.SeekArc_thumbText);
+      if (a.hasValue(R.styleable.SeekArc_thumbTextSize)) {
+        mTextPaint.setTextSize((int) a.getDimension(R.styleable.SeekArc_thumbTextSize, -1));
+      }
+      //WARNING: This is untested
+      if (a.hasValue(R.styleable.SeekArc_thumbTextFont))
+        mTextPaint.setTypeface(Typeface.createFromAsset(
+          context.getAssets(),
+          "fonts/" + context.getString(a.getInt(R.styleable.SeekArc_thumbTextFont, -1))));
+      mTextPaint.setColor(a.getColor(R.styleable.SeekArc_thumbTextColor, arcColor));
+
 			arcColor = a.getColor(R.styleable.SeekArc_arcColor, arcColor);
-			progressColor = a.getColor(R.styleable.SeekArc_progressColor,
-					progressColor);
+      mProgressColor = a.getColor(R.styleable.SeekArc_progressColor,
+        mProgressColor);
+      if (a.hasValue(R.styleable.SeekArc_progressColorSecondary))
+          mProgressColorSecondary = a.getColor(R.styleable.SeekArc_progressColorSecondary, -1);
 
 			a.recycle();
 		}
@@ -256,7 +296,7 @@ public class SeekArc extends View {
 		//mArcPaint.setAlpha(45);
 
 		mProgressPaint = new Paint();
-		mProgressPaint.setColor(progressColor);
+		mProgressPaint.setColor(mProgressColor);
 		mProgressPaint.setAntiAlias(true);
 		mProgressPaint.setStyle(Paint.Style.STROKE);
 		mProgressPaint.setStrokeWidth(mProgressWidth);
@@ -272,6 +312,20 @@ public class SeekArc extends View {
 		if(!mClockwise) {
 			canvas.scale(-1, 1, mArcRect.centerX(), mArcRect.centerY() );
 		}
+
+    //Set gradient
+    if (mProgressColorSecondary != null) {
+      int[] colors = {mProgressColor, mProgressColorSecondary};
+      float[] positions = {0, mProgressSweep / 360f};
+      SweepGradient gradient = new SweepGradient(mArcRect.centerX(), mArcRect.centerY(), colors , positions);
+      //This extra rotation is necessary to include the rounded 'cap' on the line in the sweep gradient correctly
+      float extraRotate = mRoundedEdges ? (float) (mProgressWidth / 2 / (Math.PI * mArcRect.height()) * 360.0) : 0;
+      float rotate = mStartAngle + mAngleOffset + mRotation - extraRotate;
+      Matrix gradientMatrix = new Matrix();
+      gradientMatrix.preRotate(rotate, mArcRect.centerX(), mArcRect.centerY());
+      gradient.setLocalMatrix(gradientMatrix);
+      mProgressPaint.setShader(gradient);
+    }
 		
 		// Draw the arcs
 		final int arcStart = mStartAngle + mAngleOffset + mRotation;
@@ -280,11 +334,14 @@ public class SeekArc extends View {
 		canvas.drawArc(mArcRect, arcStart, mProgressSweep, false,
 				mProgressPaint);
 
-		if(mEnabled) {
-			// Draw the thumb nail
-			canvas.translate(mTranslateX - mThumbXPos, mTranslateY - mThumbYPos);
-			mThumb.draw(canvas);
-		}
+    // Draw the thumb nail
+    canvas.translate(mTranslateX - mThumbXPos, mTranslateY - mThumbYPos);
+    mThumb.draw(canvas);
+
+    //Thumbnail text
+    Rect textBounds = new Rect();
+    mTextPaint.getTextBounds(mThumbLabel, 0, mThumbLabel.length(), textBounds);
+    canvas.drawText(mThumbLabel, 0, mThumbLabel.length(), 0, textBounds.height() / 2, mTextPaint);
 	}
 
 
@@ -430,7 +487,7 @@ public class SeekArc extends View {
 		mThumbYPos = (int) (mArcRadius * Math.sin(Math.toRadians(thumbAngle)));
 	}
 	
-	private void updateProgress(int progress, boolean fromUser) {
+	private void updateProgress(double progress, boolean fromUser) {
 
 		if (progress == INVALID_PROGRESS_VALUE) {
 			return;
@@ -466,11 +523,11 @@ public class SeekArc extends View {
 		mOnSeekArcChangeListener = l;
 	}
 
-	public void setProgress(int progress) {
+	public void setProgress(double progress) {
 		updateProgress(progress, false);
 	}
 
-	public int getProgress() {
+	public double getProgress() {
 		return mProgress;
 	}
 
@@ -550,13 +607,17 @@ public class SeekArc extends View {
 		return mClockwise;
 	}
 
-	public boolean isEnabled() {
-		return mEnabled;
-	}
+  public boolean isEnabled() {
+    return mEnabled;
+  }
 
-	public void setEnabled(boolean enabled) {
-		this.mEnabled = enabled;
-	}
+  public void setEnabled(boolean enabled) {
+    this.mEnabled = enabled;
+  }
+
+  public void setThumbLabel(String thumbLabel) {
+    this.mThumbLabel = thumbLabel;
+  }
 
 	public int getProgressColor() {
 		return mProgressPaint.getColor();
